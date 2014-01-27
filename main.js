@@ -76,11 +76,11 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
             animate();
         });
 
-        renderer = new THREE.WebGLRenderer();
-        renderer.setSize( window.innerWidth, window.innerHeight );
+        var c = document.getElementById("canvas");
+        renderer = new THREE.WebGLRenderer({canvas: c});
+        // renderer.setSize( window.innerWidth, window.innerHeight );
         renderer.setClearColor( 0xffffff, 1);
-
-        document.body.appendChild( renderer.domElement );
+        // document.body.appendChild( renderer.domElement );
     }
 
     function animate() {

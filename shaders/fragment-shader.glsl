@@ -24,5 +24,5 @@ void main() {
 
 	vec4 colorSample = texture2D(map, texCoord);
 
-	gl_FragColor = colorSample;
+	gl_FragColor = vec4(colorSample.xy, 0.0, 1.0);
 }
