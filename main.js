@@ -17,7 +17,6 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
     var isInitialized = false;
 
     init();
-    animate();
 
     function init() {
 
@@ -52,7 +51,7 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
          * mesh
          */     
 
-        geometry = new THREE.PlaneGeometry(100, 100, 1, 1);
+        geometry = new THREE.PlaneGeometry(3.2, 1.2, 1, 1);
         
         uniforms = {
             time: { type: "f", value: 0.0 },
@@ -68,14 +67,14 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
         mesh = new THREE.Mesh( geometry, material );
         scene.add( mesh );
 
-        initMaterial = new THREE.ShaderMaterial({
-            uniforms: {},
-            vertexShader: VertexShader,
-            fragmentShader: Noise + InitFragmentShader
-        });
+        var texture = new THREE.ImageUtils.loadTexture("colors-texture.jpg", {}, function () {
+            initMaterial = new THREE.MeshBasicMaterial({map:texture});
 
-        initMesh = new THREE.Mesh( geometry, initMaterial );
-        initScene.add( initMesh );
+            initMesh = new THREE.Mesh( geometry, initMaterial );
+            initScene.add( initMesh );
+
+            animate();
+        });
 
         renderer = new THREE.WebGLRenderer();
         renderer.setSize( window.innerWidth, window.innerHeight );
@@ -95,7 +94,7 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
 
         var fromMap = uniforms.time.value % 2.0 ? map2 : map1;
         var toMap = uniforms.time.value % 2.0 ? map1 : map2;
-        
+
         uniforms.map.value = fromMap;
 
         // render to texture
