@@ -1,16 +1,20 @@
 require([
     "libs/text!shaders/vertex-shader.glsl",
-    "libs/text!shaders/fragment-shader.glsl"
+    "libs/text!shaders/fragment-shader.glsl",
+    "libs/text!shaders/init-fragment-shader.glsl",
+    "libs/text!shaders/simplex-noise-2D.glsl"
 ],
 
-function ( VertexShader, FragmentShader ) {
+function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
 
     "use strict";
 
-    var camera, scene, renderer;
-    var uniforms, geometry, material, mesh;
+    var camera, renderer;
+    var uniforms, geometry, material, mesh, scene;
+    var initMaterial, initMesh, initScene;
     var directionalLight;
     var map1, map2;
+    var isInitialized = false;
 
     init();
     animate();
@@ -18,10 +22,11 @@ function ( VertexShader, FragmentShader ) {
     function init() {
 
         camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100 );
-        camera.position.set(0, 0, -1);
-        camera.lookAt(new THREE.Vector3(0,0,0));
+        camera.position.set(0, 0, 1);
+        camera.lookAt(new THREE.Vector3(0,0,-1));
 
         scene = new THREE.Scene();
+        initScene = new THREE.Scene();
 
         map1 = new THREE.WebGLRenderTarget( 
             window.innerWidth,
@@ -44,15 +49,14 @@ function ( VertexShader, FragmentShader ) {
         );
 
         /**
-         * Water
-         */
+         * mesh
+         */     
 
         geometry = new THREE.PlaneGeometry(100, 100, 1, 1);
         
         uniforms = {
-            time: { type: "f", value: 1.0 },
-            map1: { type: "t", value: map1 },
-            map2: { type: "t", value: map2 }
+            time: { type: "f", value: 0.0 },
+            map: { type: "t", value: map1 }
         };
 
         material = new THREE.ShaderMaterial({
@@ -62,8 +66,16 @@ function ( VertexShader, FragmentShader ) {
         });
 
         mesh = new THREE.Mesh( geometry, material );
-        mesh.rotation.x = Math.PI*3/2;
         scene.add( mesh );
+
+        initMaterial = new THREE.ShaderMaterial({
+            uniforms: {},
+            vertexShader: VertexShader,
+            fragmentShader: Noise + InitFragmentShader
+        });
+
+        initMesh = new THREE.Mesh( geometry, initMaterial );
+        initScene.add( initMesh );
 
         renderer = new THREE.WebGLRenderer();
         renderer.setSize( window.innerWidth, window.innerHeight );
@@ -73,16 +85,28 @@ function ( VertexShader, FragmentShader ) {
     }
 
     function animate() {
-
         requestAnimationFrame( animate );
 
-        uniforms.time.value += 0.02;
+        if(!isInitialized) {
+            // render initial noise texture to map1
+            renderer.render( initScene, camera, map1, true );
+            isInitialized = true;
+        }
+
+        var fromMap = uniforms.time.value % 2.0 ? map2 : map1;
+        var toMap = uniforms.time.value % 2.0 ? map1 : map2;
+        
+        uniforms.map.value = fromMap;
 
         // render to texture
-        renderer.render( scene, camera, map2, true );
+        renderer.render( scene, camera, toMap, true );
 
         // render to screen
         renderer.render( scene, camera );
+        uniforms.time.value += 1.0;
     }
 
 });
+
+
+
