@@ -1,19 +1,22 @@
 require([
     "libs/text!shaders/vertex-shader.glsl",
     "libs/text!shaders/fragment-shader.glsl",
-    "libs/text!shaders/init-fragment-shader.glsl",
-    "libs/text!shaders/simplex-noise-2D.glsl"
+    "libs/text!shaders/state-fragment-shader.glsl",
+    // "libs/text!shaders/simplex-noise-2D.glsl"
 ],
 
-function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
+function ( VertexShader, FragmentShader, StateFragmentShader ) {
 
     "use strict";
 
     var camera, renderer;
     var uniforms, geometry, material, mesh, scene;
-    var initMaterial, initMesh, initScene;
-    var directionalLight;
-    var map1, map2;
+    var colorMaterial, colorMesh, colorScene;
+    var initStateMaterial, initStateMesh, initStateScene, 
+        stateMaterial, stateMesh, stateScene;
+
+    var colorMapPing, colorMapPong,
+        stateMapPing, stateMapPong;
     var isInitialized = false;
 
     init();
@@ -25,9 +28,11 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
         camera.lookAt(new THREE.Vector3(0,0,-1));
 
         scene = new THREE.Scene();
-        initScene = new THREE.Scene();
+        colorScene = new THREE.Scene();
+        initStateScene = new THREE.Scene();
+        stateScene = new THREE.Scene();
 
-        map1 = new THREE.WebGLRenderTarget( 
+        colorMapPing = new THREE.WebGLRenderTarget( 
             window.innerWidth,
             window.innerHeight,
             { 
@@ -37,7 +42,27 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
             }
         );
 
-        map2 = new THREE.WebGLRenderTarget( 
+        colorMapPong = new THREE.WebGLRenderTarget( 
+            window.innerWidth,
+            window.innerHeight,
+            { 
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.NearestFilter,
+                format: THREE.RGBFormat
+            }
+        );
+
+        stateMapPing = new THREE.WebGLRenderTarget( 
+            window.innerWidth,
+            window.innerHeight,
+            { 
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.NearestFilter,
+                format: THREE.RGBFormat
+            }
+        );
+
+        stateMapPong = new THREE.WebGLRenderTarget( 
             window.innerWidth,
             window.innerHeight,
             { 
@@ -55,7 +80,8 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
         
         uniforms = {
             time: { type: "f", value: 0.0 },
-            map: { type: "t", value: map1 }
+            colorMap: { type: "t", value: colorMapPing },
+            stateMap: { type: "t", value: stateMapPing }
         };
 
         material = new THREE.ShaderMaterial({
@@ -67,13 +93,30 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
         mesh = new THREE.Mesh( geometry, material );
         scene.add( mesh );
 
-        var texture = new THREE.ImageUtils.loadTexture("colors-texture.jpg", {}, function () {
-            initMaterial = new THREE.MeshBasicMaterial({map:texture});
+        var colorTexture = new THREE.ImageUtils.loadTexture("textures/color-map-init.jpg", {}, function () {
+            colorMaterial = new THREE.MeshBasicMaterial({map:colorTexture});
 
-            initMesh = new THREE.Mesh( geometry, initMaterial );
-            initScene.add( initMesh );
+            colorMesh = new THREE.Mesh( geometry, colorMaterial );
+            colorScene.add( colorMesh );
 
-            animate();
+            var stateTexture = new THREE.ImageUtils.loadTexture("textures/state-map-init.jpg", {}, function () {
+
+                initStateMaterial = new THREE.MeshBasicMaterial({map:stateTexture});
+
+                initStateMesh = new THREE.Mesh( geometry, initStateMaterial );
+                initStateScene.add( initStateMesh );
+
+                stateMaterial = new THREE.ShaderMaterial({
+                    uniforms: uniforms,
+                    vertexShader: VertexShader,
+                    fragmentShader: StateFragmentShader
+                });
+
+                stateMesh = new THREE.Mesh( geometry, stateMaterial );
+                stateScene.add( stateMesh );
+
+                animate();
+            });
         });
 
         var c = document.getElementById("canvas");
@@ -84,21 +127,34 @@ function ( VertexShader, FragmentShader, InitFragmentShader, Noise ) {
     }
 
     function animate() {
+
         requestAnimationFrame( animate );
 
         if(!isInitialized) {
-            // render initial noise texture to map1
-            renderer.render( initScene, camera, map1, true );
+
+            renderer.render( colorScene, camera, colorMapPing, true );
+            renderer.render( initStateScene, camera, stateMapPing, true );
+
             isInitialized = true;
         }
 
-        var fromMap = uniforms.time.value % 2.0 ? map2 : map1;
-        var toMap = uniforms.time.value % 2.0 ? map1 : map2;
+        // ping-ponging
+        var pingOrPong = uniforms.time.value % 2.0;
 
-        uniforms.map.value = fromMap;
+        var fromColorMap = pingOrPong ? colorMapPong : colorMapPing;
+        var toColorMap = pingOrPong ? colorMapPing : colorMapPong;
 
-        // render to texture
-        renderer.render( scene, camera, toMap, true );
+        var fromStateMap = pingOrPong ? stateMapPong : stateMapPing;
+        var toStateMap = pingOrPong ? stateMapPing : stateMapPong;
+
+        uniforms.colorMap.value = fromColorMap;
+        uniforms.stateMap.value = fromStateMap;
+
+        // update state (velocity/pressure) map
+        renderer.render( stateScene, camera, toStateMap, true );
+
+        // update color map
+        renderer.render( scene, camera, toColorMap, true );
 
         // render to screen
         renderer.render( scene, camera );
