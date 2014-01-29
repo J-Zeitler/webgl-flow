@@ -7,48 +7,66 @@ uniform sampler2D stateMap;
 varying vec4 pos;
 
 
-vec2 pressure(vec2 coord) {
+/**
+ * PressureForce force
+ */
+vec2 pressureForce(vec2 coord) {
 
-	// just check x component 0 or 1 for now
-	float cR = texture2D(colorMap, vec2(coord.x+0.01, coord.y)).x;
-	float cL = texture2D(colorMap, vec2(coord.x-0.01, coord.y)).x;
-	float cU = texture2D(colorMap, vec2(coord.x, coord.y+0.01)).x;
-	float cD = texture2D(colorMap, vec2(coord.x, coord.y-0.01)).x;
+  // just check x component 0 or 1 for now
+  float cR = texture2D(colorMap, vec2(coord.x+0.01, coord.y)).x;
+  float cL = texture2D(colorMap, vec2(coord.x-0.01, coord.y)).x;
+  float cU = texture2D(colorMap, vec2(coord.x, coord.y+0.01)).x;
+  float cD = texture2D(colorMap, vec2(coord.x, coord.y-0.01)).x;
 
-	vec2 eX = vec2(1.0, 0.0);
-	vec2 eY = vec2(0.0, 1.0);
+  vec2 p = vec2(cR - cL, cU - cD);
 
-	vec2 p = cR * eX - cL * eX + cU * eY - cD * eY;
-
-	return -p;
+  return p;
 }
 
+
+/**
+ * Tex to value
+ */
+vec4 texToValue(vec4 tex) {
+  return 2.0 * tex - 1.0;
+}
+
+
+/**
+ * Value to tex
+ */
+vec4 valueToTex(vec4 value) {
+  return value*0.5 + 0.5;
+}
+
+
+/**
+ * Advect velocities
+ */
 vec4 advec(vec2 coord, float dt) {
 
-	vec4 coordState = 2.0 * texture2D(stateMap, coord) - 1.0;
+  vec4 coordState = texToValue(texture2D(stateMap, coord));
 
-	// RK2
-	vec2 midVelocity = 2.0 * texture2D(stateMap, coord - 0.5 * dt * coordState.xy).xy - 1.0;
-	vec4 advectState = 2.0 * texture2D(stateMap, coord - dt * midVelocity) - 1.0 ;
+  // RK2
+  vec2 midVelocity = texToValue(texture2D(stateMap, coord - 0.5 * dt * coordState.xy)).xy;
+  vec4 advectState = texToValue(texture2D(stateMap, coord - dt * midVelocity));
 
-	advectState.xy += 0.5 * pressure(coord);
-	advectState.xy = 0.5 * advectState.xy + 0.5;
-	advectState.z = 0.0;
-	advectState.w = 1.0;
+  advectState.xy -= 0.5 * pressureForce(coord);
+  advectState = valueToTex(advectState);
 
-	return advectState;
+  return advectState;
 }
 
+
+/**
+ * Main
+ */
 void main() {
 
-	const float dt = 0.01;
+  const float dt = 0.005;
 
-	vec2 pos2d = pos.xy;
+  vec2 pos2d = pos.xy;
+  vec2 texCoord = pos2d * 0.5 + 0.5;
 
-	vec2 texCoord = vec2(
-        0.5 * pos2d.x + 0.5,
-        0.5 * pos2d.y + 0.5
-    );
-
-	gl_FragColor = advec(texCoord, dt);
+  gl_FragColor = advec(texCoord, dt);
 }
